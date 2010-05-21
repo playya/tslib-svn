@@ -320,6 +320,15 @@ cy8mrln_palmpre_read(struct tslib_module_info *info, struct ts_sample *samp, int
 	int max_index = 0, max_value = 0, i = 0;
 	uint16_t tmp_value;
 	int ret, valid_samples = 0;
+	struct ts_sample *p = samp;
+	
+	/* initalize all samples with proper values */
+	for (i = 0; i < nr; i++, p++)
+	{
+		p->x = 0;
+		p->y = 0;
+		p->pressure = 0;
+	}
 	
 	cy8mrln_info = container_of(info, struct tslib_cy8mrln_palmpre, module);
 	
