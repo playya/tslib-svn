@@ -2,15 +2,16 @@
  *  tslib/plugins/cy8mrln-palmpre.c
  *
  *  Copyright (C) 2010 Frederik Sdun <frederik.sdun@googlemail.com>
- *		       Thomas Zimmermann <ml@vdm-design.de>
- *
+ *                     Thomas Zimmermann <ml@vdm-design.de>
+ *                     Simon Busch <morphis@gravedo.de>
  *
  * This file is placed under the LGPL.  Please see the file
  * COPYING for more details.
  *
+ * Plugin for the cy8mrln touchscreen with the firmware used on the Palm Pre (Plus).
  *
- * Pluging for the cy8mrln touchscreen with the Firmware used on the Palm Pre
  */
+
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -23,12 +24,15 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-
+#include <linux/spi/cy8mrln.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stddef.h>
 #include "config.h"
 #include "tslib-private.h"
 #include "tslib-filter.h"
-
-#include "cy8mrln.h"
 
 #define NOISE          25
 #define SCREEN_WIDTH   319
@@ -43,14 +47,14 @@
 
 struct cy8mrln_palmpre_input
 {  
-	uint16_t n_r;
-	uint16_t field[H_FIELDS * V_FIELDS];
-	uint16_t ffff;		  //seperator? always ff
-	uint8_t seq_nr1;		//incremented if seq_nr0 = scanrate
-	uint16_t seq_nr2;	       //incremeted if seq_nr1 = 255
-	uint8_t unknown[4]; 
-	uint8_t seq_nr0;		//incremented. 0- scanrate
-	uint8_t null;		   //\0
+	uint16_t	n_r;
+	uint16_t	field[H_FIELDS * V_FIELDS];
+	uint16_t	ffff;			/* always 0xffff */
+	uint8_t		seq_nr1;		/* incremented if seq_nr0 == scanrate */
+	uint16_t	seq_nr2;		/* incremeted if seq_nr1 == 255 */
+	uint8_t		unknown[4]; 
+	uint8_t		seq_nr0;		/* incremented [0:scanrate] */
+	uint8_t		null;		   /* NULL byte */
 }__attribute__((packed));
 
 struct tslib_cy8mrln_palmpre 
@@ -242,10 +246,8 @@ interpolate(uint16_t field[H_FIELDS * V_FIELDS], int i, struct ts_sample *out) {
 	      ? 0.0 : 0.5 * field[i + 1] / field[i];
 	f23 = (i % H_FIELDS == 0) ? 0.0 : 0.5 * field[i - 1] / field[i];
 
-	/*
-	   correct values for the edges, shift the mesuarment point by half a 
-	   field diminsion to the outside
-	*/
+	/* correct values for the edges, shift the mesuarment point by half a 
+	 * field diminsion to the outside */
 	if (i == 0) {
 		x = x + dx / 2;
 		f21 = f21 * 2.0;
@@ -410,7 +412,7 @@ TSAPI struct tslib_module_info *cy8mrln_palmpre_mod_init(struct tsdev *dev, cons
 		return NULL;
 	}
 
-	/* We need the intial values the touchscreen repots with no touch input force
+	/* We need the intial values the touchscreen repots with no touch input for
 	 * later use */
 	do {
 		ret = read(dev->fd, &input, sizeof(input));
