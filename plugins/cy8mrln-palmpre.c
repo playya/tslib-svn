@@ -294,21 +294,23 @@ static int parse_ts_pressure(struct tslib_module_info *info, char *str, void *da
  *      f32
  */
 
-static void cy8mrln_palmpre_interpolate(uint16_t field[H_FIELDS * V_FIELDS], int x, int y, struct ts_sample *out) {
+static void cy8mrln_palmpre_interpolate(uint16_t field[H_FIELDS * V_FIELDS], int x, int y, struct ts_sample *out)
+{
 	float f12, f21, f23, f32;
 	int posx = SCREEN_WIDTH - SCREEN_WIDTH / H_FIELDS * x;
 	int posy = SCREEN_HEIGHT / V_FIELDS * y;
 	static const int dx = SCREEN_WIDTH / H_FIELDS;
 	static const int dy = SCREEN_HEIGHT / V_FIELDS;
-	
+
 	/* caluculate corrections for top, bottom, left and right fields */
-	f12 = (y == 0) ? 0.0f : 0.5 * ((float)field[(y - 1) * H_FIELDS + x] / field[y * H_FIELDS + x]);
-	f32 = (y == (V_FIELDS - 1)) ? 0.0f : 0.5 * (float)field[(y + 1) * H_FIELDS + x] / field[y * H_FIELDS + x];
-	f21 = (x == (H_FIELDS - 1)) ? 0.0f : 0.5 * (float)field[y * H_FIELDS + x + 1] / field[y * H_FIELDS + x];
-	f23 = (x == 0) ? 0.0f : 0.5 * (float) field[y * H_FIELDS + x - 1] / field[y * H_FIELDS + x];
+	f12 = (y == 0) ? -0.5f : 0.5 * ((float)field[(y - 1) * H_FIELDS + x] / field[y * H_FIELDS + x]) - 0.5;
+	f32 = (y == (V_FIELDS - 1)) ? -0.5f : 0.5 * ((float)field[(y + 1) * H_FIELDS + x] / field[y * H_FIELDS + x]) - 0.5;
+	f21 = (x == (H_FIELDS - 1)) ? -0.5f : 0.5 * ((float)field[y * H_FIELDS + x + 1] / field[y * H_FIELDS + x]) - 0.5;
+	f23 = (x == 0) ? -0.5f : 0.5 * ((float) field[y * H_FIELDS + x - 1] / field[y * H_FIELDS + x]) - 0.5;
 
 	/* correct values for the edges, shift the mesuarment point by half a 
 	 * field diminsion to the outside */
+	/*
 	if (x == 0) {
 		posx = posx + dx / 2.0;
 		f21 = f21 * 2.0;
@@ -324,6 +326,7 @@ static void cy8mrln_palmpre_interpolate(uint16_t field[H_FIELDS * V_FIELDS], int
 		posy = posy + dy / 2.0;
 		f12 = f12 * 2.0;
 	}
+	*/
 
 	out->x = posx // + (f13 + f33 - f11 - f31) * dx /* use corners too?*/
 		 + (f23 - f21) * dx
