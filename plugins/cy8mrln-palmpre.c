@@ -329,12 +329,12 @@ static void cy8mrln_palmpre_interpolate(uint16_t field[H_FIELDS * V_FIELDS], int
 	*/
 
 	out->x = posx // + (f13 + f33 - f11 - f31) * dx /* use corners too?*/
-		 + (f23 - f21) * dx
+		 + (f23 - f21) * dx;
 //		 + (f21 == 0.0) ? ((f23 * 2 + (dx / 2)) * dx) : (f23 * dx)
 //		 - (f23 == 0.0) ? ((f21 * 2 + (dx / 2)) * dx) : (f21 * dx)
-		 - (dx / 2);
+		 //- (dx / 2);
 	out->y = posy // + (f31 + f33 - f11 - f13) * dy /* use corners too?*/
-		 + (f32 - f12) * dy + (dy / 2);
+		 + (f32 - f12) * dy; // + (dy / 2);
 
 #ifdef DEBUG
 	fprintf(stderr, "RAW---------------------------> (%i/%i) f12: %f f21: %f, f23: %f, f32: %f\n", x, y, f12, f21, f23, f32);
