@@ -25,7 +25,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "cy8mrln.h"
+#include <linux/spi/cy8mrln.h>
 #include "config.h"
 #include "tslib-private.h"
 #include "tslib-filter.h"
@@ -73,10 +73,10 @@ struct tslib_cy8mrln_palmpre
 	int				wot_scanrate;
 	int				timestamp_mode;
 	int				noise;
-        int                             sensor_offset_x;
-        int                             sensor_offset_y;
-        int                             sensor_delta_x;
-        int                             sensor_delta_y;
+	int				sensor_offset_x;
+	int				sensor_offset_y;
+	int				sensor_delta_x;
+	int				sensor_delta_y;
 	int				last_n_valid_samples;
 	struct ts_sample*		last_valid_samples;
 };
@@ -182,7 +182,7 @@ static int cy8mrln_palmpre_set_timestamp_mode(struct tslib_cy8mrln_palmpre* info
 {
 	v = v ? 1 : 0;
 	if(info == NULL || info->module.dev == NULL || ioctl(info->module.dev->fd,CY8MRLN_IOCTL_SET_TIMESTAMP_MODE,&v) < 0)
-	     goto error;
+		goto error;
 	info->timestamp_mode = v;
 	return 0;
 	
@@ -204,8 +204,8 @@ static int cy8mrln_palmpre_set_noise (struct tslib_cy8mrln_palmpre* info, int n)
 static int cy8mrln_palmpre_set_sensor_offset_x (struct tslib_cy8mrln_palmpre* info, int n)
 {
 	if (info == NULL)
-             return -1;
-        printf("sensor_offset_x: %i\n", n);
+		return -1;
+	printf("sensor_offset_x: %i\n", n);
 	
 	info->sensor_offset_x = n;
 	return 0;
@@ -214,8 +214,8 @@ static int cy8mrln_palmpre_set_sensor_offset_x (struct tslib_cy8mrln_palmpre* in
 static int cy8mrln_palmpre_set_sensor_offset_y (struct tslib_cy8mrln_palmpre* info, int n)
 {
 	if (info == NULL)
-             return -1;
-        printf("sensor_offset_y: %i\n", n);
+		return -1;
+	printf("sensor_offset_y: %i\n", n);
 	
 	info->sensor_offset_y = n;
 	return 0;
@@ -224,9 +224,9 @@ static int cy8mrln_palmpre_set_sensor_offset_y (struct tslib_cy8mrln_palmpre* in
 static int cy8mrln_palmpre_set_sensor_delta_x (struct tslib_cy8mrln_palmpre* info, int n)
 {
 	if (info == NULL)
-             return -1;
-        printf("sensor_delta_x: %i\n", n);
-	
+		return -1;
+	printf("sensor_delta_x: %i\n", n);
+
 	info->sensor_delta_x = n;
 	return 0;
 }
@@ -234,9 +234,9 @@ static int cy8mrln_palmpre_set_sensor_delta_x (struct tslib_cy8mrln_palmpre* inf
 static int cy8mrln_palmpre_set_sensor_delta_y (struct tslib_cy8mrln_palmpre* info, int n)
 {
 	if (info == NULL)
-             return -1;
-        printf("sensor_delta_y: %i\n", n);
-	
+		return -1;
+	printf("sensor_delta_y: %i\n", n);
+
 	info->sensor_delta_y = n;
 	return 0;
 }
@@ -314,6 +314,15 @@ static int parse_noise(struct tslib_module_info *info, char *str, void *data)
 
 	return cy8mrln_palmpre_set_noise (i, noise);
 }
+static int parse_noise(struct tslib_module_info *info, char *str, void *data)
+{
+    (void)data;
+	struct tslib_cy8mrln_palmpre *i = (struct tslib_cy8mrln_palmpre*) info;
+	unsigned long noise = strtoul (str, NULL, 0);
+
+	if(noise == ULONG_MAX && errno == ERANGE)
+		return -1;
+
 
 static int parse_sensor_offset_x(struct tslib_module_info *info, char *str, void *data)
 {
@@ -512,17 +521,17 @@ static int cy8mrln_palmpre_fini(struct tslib_module_info *info)
 
 static const struct tslib_vars cy8mrln_palmpre_vars[] =
 {
-	{ "scanrate",		NULL, parse_scanrate},
-	{ "verbose",		NULL, parse_verbose},
-	{ "wot_scanrate",	NULL, parse_wot_scanrate},
-	{ "wot_threshold",      NULL, parse_wot_threshold},
-	{ "sleepmode",		NULL, parse_sleepmode},
-	{ "timestamp_mode",     NULL, parse_timestamp_mode},
-	{ "noise",		NULL, parse_noise},
-        { "sensor_offset_x",     NULL, parse_sensor_offset_x},
-        { "sensor_offset_y",     NULL, parse_sensor_offset_y},
-        { "sensor_delta_x",     NULL, parse_sensor_delta_x},
-        { "sensor_delta_y",     NULL, parse_sensor_delta_y},
+	{ "scanrate",			NULL, parse_scanrate},
+	{ "verbose",			NULL, parse_verbose},
+	{ "wot_scanrate",		NULL, parse_wot_scanrate},
+	{ "wot_threshold",		NULL, parse_wot_threshold},
+	{ "sleepmode",			NULL, parse_sleepmode},
+	{ "timestamp_mode",		NULL, parse_timestamp_mode},
+	{ "noise",				NULL, parse_noise},
+	{ "sensor_offset_x",	NULL, parse_sensor_offset_x},
+	{ "sensor_offset_y",	NULL, parse_sensor_offset_y},
+	{ "sensor_delta_x",		NULL, parse_sensor_delta_x},
+	{ "sensor_delta_y",		NULL, parse_sensor_delta_y},
 };
 
 static const struct tslib_ops cy8mrln_palmpre_ops = 
@@ -538,11 +547,12 @@ TSAPI struct tslib_module_info *cy8mrln_palmpre_mod_init(struct tsdev *dev, cons
 	int ret = 0;
 	
 	info = malloc(sizeof(struct tslib_cy8mrln_palmpre));
+
 	if(info == NULL)
-	     return NULL;
+		return NULL;
+
 	info->module.ops = &cy8mrln_palmpre_ops;
-        //required to set the default valuse
-        info->module.dev = dev;
+	info->module.dev = dev;
 	info->last_valid_samples = NULL;
 	info->last_n_valid_samples = 0;
 
@@ -553,10 +563,11 @@ TSAPI struct tslib_module_info *cy8mrln_palmpre_mod_init(struct tsdev *dev, cons
 	cy8mrln_palmpre_set_wot_scanrate(info, DEFAULT_WOT_SCANRATE);
 	cy8mrln_palmpre_set_wot_threshold(info, DEFAULT_WOT_THRESHOLD);
 	cy8mrln_palmpre_set_noise(info, DEFAULT_NOISE);
-        cy8mrln_palmpre_set_sensor_offset_x (info, DEFAULT_SENSOR_OFFSET_X);
-        cy8mrln_palmpre_set_sensor_offset_y (info, DEFAULT_SENSOR_OFFSET_Y);
-        cy8mrln_palmpre_set_sensor_delta_x (info, DEFAULT_SENSOR_DELTA_X);
-        cy8mrln_palmpre_set_sensor_delta_y (info, DEFAULT_SENSOR_DELTA_Y);
+	cy8mrln_palmpre_set_sensor_offset_x (info, DEFAULT_SENSOR_OFFSET_X);
+	cy8mrln_palmpre_set_sensor_offset_y (info, DEFAULT_SENSOR_OFFSET_Y);
+	cy8mrln_palmpre_set_sensor_delta_x (info, DEFAULT_SENSOR_DELTA_X);
+	cy8mrln_palmpre_set_sensor_delta_y (info, DEFAULT_SENSOR_DELTA_Y);
+
 
 	if (tslib_parse_vars(&info->module, cy8mrln_palmpre_vars, NR_VARS, params)) {
 		free(info);
@@ -564,7 +575,7 @@ TSAPI struct tslib_module_info *cy8mrln_palmpre_mod_init(struct tsdev *dev, cons
 	}
 
 	/* We need the intial values the touchscreen repots with no touch input for
-	 * later use */
+	* later use */
 	do {
 		ret = read(dev->fd, &input, sizeof(input));
 	}
