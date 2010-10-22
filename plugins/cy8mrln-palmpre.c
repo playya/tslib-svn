@@ -328,15 +328,6 @@ static int parse_noise(struct tslib_module_info *info, char *str, void *data)
 
 	return cy8mrln_palmpre_set_noise (i, noise);
 }
-static int parse_noise(struct tslib_module_info *info, char *str, void *data)
-{
-    (void)data;
-	struct tslib_cy8mrln_palmpre *i = (struct tslib_cy8mrln_palmpre*) info;
-	unsigned long noise = strtoul (str, NULL, 0);
-
-	if(noise == ULONG_MAX && errno == ERANGE)
-		return -1;
-
 
 static int parse_sensor_offset_x(struct tslib_module_info *info, char *str, void *data)
 {
