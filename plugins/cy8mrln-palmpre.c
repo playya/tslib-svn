@@ -47,6 +47,8 @@
 #define DEFAULT_SENSOR_DELTA_Y (SCREEN_HEIGHT / (V_FIELDS - DEFAULT_GESTURE_HEIGHT))
 #define DEFAULT_SENSOR_OFFSET_X (DEFAULT_SENSOR_DELTA_X / 2)
 #define DEFAULT_SENSOR_OFFSET_Y (DEFAULT_SENSOR_DELTA_Y / 2)
+#define MIN_VALUE 600
+#define MAX_VALUE 1500
 
 #define field_nr(x, y) (y * H_FIELDS + (H_FIELDS - x) - 1)
 
@@ -57,7 +59,7 @@
 struct cy8mrln_palmpre_input
 {  
 	uint16_t	n_r;
-	uint16_t	field[H_FIELDS * V_FIELDS];
+	int16_t	field[H_FIELDS * V_FIELDS];
 	uint16_t	ffff;			/* always 0xffff */
 	uint8_t		seq_nr1;		/* incremented if seq_nr0 == scanrate */
 	uint16_t	seq_nr2;		/* incremeted if seq_nr1 == 255 */
@@ -69,7 +71,7 @@ struct cy8mrln_palmpre_input
 struct tslib_cy8mrln_palmpre 
 {
 	struct tslib_module_info	module;
-	uint16_t			references[H_FIELDS * V_FIELDS];
+	int16_t			references[H_FIELDS * V_FIELDS];
 	int				scanrate;
 	int				wot_threshold;
 	int				sleepmode;
@@ -79,6 +81,7 @@ struct tslib_cy8mrln_palmpre
 	int				pressure;
 	int				last_n_valid_samples;
 	struct ts_sample*		last_valid_samples;
+        int                             asleep;
 };
 
 static int cy8mrln_palmpre_set_scanrate (struct tslib_cy8mrln_palmpre* info, int rate);
@@ -95,8 +98,8 @@ static int parse_sleepmode (struct tslib_module_info *info, char *str, void *dat
 static int parse_timestamp_mode (struct tslib_module_info *info, char *str, void *data);
 static int parse_noise (struct tslib_module_info *info, char *str, void *data);
 static int parse_pressure (struct tslib_module_info *info, char *str, void *data);
-static void cy8mrln_palmpre_update_references (uint16_t references[H_FIELDS * V_FIELDS], uint16_t field[H_FIELDS * V_FIELDS]);
-static void cy8mrln_palmpre_interpolate (struct tslib_cy8mrln_palmpre* info, uint16_t field[H_FIELDS * V_FIELDS], int x, int y, struct ts_sample *out);
+static int cy8mrln_palmpre_update_references (int16_t references[H_FIELDS * V_FIELDS], int16_t field[H_FIELDS * V_FIELDS]);
+static void cy8mrln_palmpre_interpolate (struct tslib_cy8mrln_palmpre* info, int16_t field[H_FIELDS * V_FIELDS], int x, int y, struct ts_sample *out);
 static int cy8mrln_palmpre_fini (struct tslib_module_info *info);
 static int cy8mrln_palmpre_read (struct tslib_module_info *info, struct ts_sample *samp, int nr);
 TSAPI struct tslib_module_info *cy8mrln_palmpre_mod_init (struct tsdev *dev, const char *params);
@@ -238,12 +241,12 @@ static int parse_timestamp_mode(struct tslib_module_info *info, char *str, void 
 {
 	(void)data;
 	struct tslib_cy8mrln_palmpre *i = (struct tslib_cy8mrln_palmpre*) info;
-	unsigned long sleep = strtoul(str, NULL, 0);
+	unsigned long mode = strtoul(str, NULL, 0);
 
-	if(sleep == ULONG_MAX && errno == ERANGE)
+	if(mode == ULONG_MAX && errno == ERANGE)
 		return -1;
 
-	return cy8mrln_palmpre_set_sleepmode(i, sleep);
+	return cy8mrln_palmpre_set_timestamp_mode(i, mode);
 }
 
 static int parse_noise(struct tslib_module_info *info, char *str, void *data)
@@ -277,7 +280,7 @@ static int parse_pressure(struct tslib_module_info *info, char *str, void *data)
 *     y3
 */
 
-static void cy8mrln_palmpre_interpolate(struct tslib_cy8mrln_palmpre* info, uint16_t field[H_FIELDS * V_FIELDS], int x, int y, struct ts_sample *out)
+static void cy8mrln_palmpre_interpolate(struct tslib_cy8mrln_palmpre* info, int16_t field[H_FIELDS * V_FIELDS], int x, int y, struct ts_sample *out)
 {
 	float fx, fy;
 	int tmpxy, tmpx1, tmpx3, tmpy1, tmpy3;
@@ -324,7 +327,7 @@ static int cy8mrln_palmpre_read(struct tslib_module_info *info, struct ts_sample
 	struct cy8mrln_palmpre_input cy8mrln_evt;
 	struct tslib_cy8mrln_palmpre *cy8mrln_info;
 	int max_x = 0, max_y = 0, max_value = 0, x, y;
-	uint16_t tmp_value;
+	int16_t tmp_value;
 	int ret, valid_samples = 0;
 	struct ts_sample *p = samp;
 	
@@ -335,7 +338,23 @@ static int cy8mrln_palmpre_read(struct tslib_module_info *info, struct ts_sample
 	
 	ret = read(ts->fd, &cy8mrln_evt, sizeof(cy8mrln_evt));
 	if (ret > 0) {
-		cy8mrln_palmpre_update_references (cy8mrln_info->references, cy8mrln_evt.field);
+		if(cy8mrln_palmpre_update_references (cy8mrln_info->references, cy8mrln_evt.field)) {
+                        if(!cy8mrln_info->asleep) {
+#ifdef DEBUG
+                                fprintf(stderr, "cy8mrln: go to sleep\n");
+#endif
+                                cy8mrln_info->asleep = 1;
+                                cy8mrln_palmpre_set_scanrate(cy8mrln_info, 5);
+                        }
+                        return 0;
+                } else if(cy8mrln_info->asleep) {
+#ifdef DEBUG
+                        fprintf(stderr, "cy8mrln: woke up\n");
+#endif
+                        cy8mrln_palmpre_set_scanrate(cy8mrln_info, cy8mrln_info->scanrate);
+                        cy8mrln_info->asleep = 0;
+                        return 0;
+                }
 		max_x = 0;
 		max_y = 0;
 		max_value = 0;
@@ -387,19 +406,32 @@ static int cy8mrln_palmpre_read(struct tslib_module_info *info, struct ts_sample
 	return valid_samples;
 }
 
-static void cy8mrln_palmpre_update_references(uint16_t references[H_FIELDS * V_FIELDS], uint16_t field[H_FIELDS * V_FIELDS])
+static int cy8mrln_palmpre_update_references(int16_t references[H_FIELDS * V_FIELDS], int16_t field[H_FIELDS * V_FIELDS])
 {
 	int x, y;
+        static int last_discarded = 0;
 	for (y = 0; y < V_FIELDS; y ++) {
 		for (x = 0; x < H_FIELDS; x++) {
-			if (field[y * H_FIELDS + x] > references[y * H_FIELDS + x]) {
+                        if(field[y * H_FIELDS + x] < MIN_VALUE || field[y * H_FIELDS + x] > MAX_VALUE) {
+#ifdef DEBUG
+                                fprintf(stderr, "Discrading frame with %i at[%i/%i]\n", field[y * H_FIELDS + x], x, y);
+#endif
+                                last_discarded = 1;
+                                return 1;
+                        } else if(last_discarded) {
+                                last_discarded = 0;
+                                return 1;
+                        } else if (field[y * H_FIELDS + x] > references[y * H_FIELDS + x]) {
+                                if(last_discarded)
 				references [y * H_FIELDS + x] = field [y * H_FIELDS + x];
 				field [y * H_FIELDS + x] = 0;
 			} else {
+                                if(last_discarded)
 				field [y * H_FIELDS + x] = references [y * H_FIELDS + x] - field [y * H_FIELDS + x];
 			}
 		}
 	}
+        return 0;
 }
 
 static int cy8mrln_palmpre_fini(struct tslib_module_info *info)
@@ -447,6 +479,7 @@ TSAPI struct tslib_module_info *cy8mrln_palmpre_mod_init(struct tsdev *dev, cons
 	info->module.dev = dev;
 	info->last_valid_samples = NULL;
 	info->last_n_valid_samples = 0;
+        info->asleep = 0;
 
 	cy8mrln_palmpre_set_scanrate(info, DEFAULT_SCANRATE);
 	cy8mrln_palmpre_set_timestamp_mode(info, DEFAULT_TIMESTAMP_MODE);
@@ -468,7 +501,7 @@ TSAPI struct tslib_module_info *cy8mrln_palmpre_mod_init(struct tsdev *dev, cons
 		ret = read(dev->fd, &input, sizeof(input));
 	}
 	while (ret <= 0);
-	memcpy(info->references, input.field, H_FIELDS * V_FIELDS * sizeof(uint16_t));
+	memcpy(info->references, input.field, H_FIELDS * V_FIELDS * sizeof(int16_t));
 
 	return &(info->module);
 }
