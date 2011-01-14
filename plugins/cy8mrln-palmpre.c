@@ -81,7 +81,7 @@ struct tslib_cy8mrln_palmpre
 	int				pressure;
 	int				last_n_valid_samples;
 	struct ts_sample*		last_valid_samples;
-        int                             asleep;
+	int			     asleep;
 };
 
 static int cy8mrln_palmpre_set_scanrate (struct tslib_cy8mrln_palmpre* info, int rate);
@@ -197,82 +197,6 @@ static int cy8mrln_palmpre_set_pressure (struct tslib_cy8mrln_palmpre* info, int
 	return 0;
 }
 
-static int cy8mrln_palmpre_set_sensor_offset_x (struct tslib_cy8mrln_palmpre* info, int n)
-{
-	if (info == NULL)
-		return -1;
-
-#ifdef DEBUG
-	printf("sensor_offset_x: %i\n", n);
-#endif
-	
-	info->sensor_offset_x = n;
-	return 0;
-}
-
-static int cy8mrln_palmpre_set_sensor_offset_y (struct tslib_cy8mrln_palmpre* info, int n)
-{
-	if (info == NULL)
-		return -1;
-
-#ifdef DEBUG 
-	printf("sensor_offset_y: %i\n", n);
-#endif
-	
-	info->sensor_offset_y = n;
-	return 0;
-}
-
-static int cy8mrln_palmpre_set_sensor_delta_x (struct tslib_cy8mrln_palmpre* info, int n)
-{
-	if (info == NULL)
-		return -1;
-
-#ifdef DEBUG
-	printf("sensor_delta_x: %i\n", n);
-#endif
-
-	info->sensor_delta_x = n;
-	return 0;
-}
-
-static int cy8mrln_palmpre_set_sensor_delta_y (struct tslib_cy8mrln_palmpre* info, int n)
-{
-	if (info == NULL)
-		return -1;
-
-#ifdef DEBUG
-	printf("sensor_delta_y: %i\n", n);
-#endif
-
-	info->sensor_delta_y = n;
-	return 0;
-}
-
-static int parse_scanrate(struct tslib_module_info *info, char *str, void *data)
-{
-	(void)data;
-	struct tslib_cy8mrln_palmpre *i = container_of(info, struct tslib_cy8mrln_palmpre, module);
-	unsigned long rate = strtoul(str, NULL, 0);
->>>>>>> 860d69cadedef0dec8ba6259ab5850691d3402e7
-
-	info->noise = n;
-
-	return 0;
-}
-
-static int cy8mrln_palmpre_set_pressure (struct tslib_cy8mrln_palmpre* info, int p)
-{
-	if (info == NULL) {
-		printf("TSLIB: cy8mrln_palmpre: ERROR: could not set default_pressure value\n");
-		return -1;
-	}
-
-	info->pressure = p;
-
-	return 0;
-}
-
 static int parse_scanrate(struct tslib_module_info *info, char *str, void *data)
 {
 	(void)data;
@@ -281,7 +205,6 @@ static int parse_scanrate(struct tslib_module_info *info, char *str, void *data)
 
 	return cy8mrln_palmpre_set_scanrate(i, rate);
 }
-
 
 static int parse_wot_scanrate(struct tslib_module_info *info, char *str, void *data)
 {
@@ -321,6 +244,19 @@ static int parse_timestamp_mode(struct tslib_module_info *info, char *str, void 
 
 	return cy8mrln_palmpre_set_timestamp_mode(i, mode);
 }
+
+static int parse_noise(struct tslib_module_info *info, char *str, void *data)
+{
+	(void)data;
+	struct tslib_cy8mrln_palmpre *i = (struct tslib_cy8mrln_palmpre*) info;
+	unsigned long noise = strtoul (str, NULL, 0);
+
+	if(noise == ULONG_MAX && errno == ERANGE)
+		return -1;
+
+	return cy8mrln_palmpre_set_noise (i, noise);
+}
+
 static int parse_pressure(struct tslib_module_info *info, char *str, void *data)
 {
 	(void)data;
@@ -399,22 +335,22 @@ static int cy8mrln_palmpre_read(struct tslib_module_info *info, struct ts_sample
 	ret = read(ts->fd, &cy8mrln_evt, sizeof(cy8mrln_evt));
 	if (ret > 0) {
 		if(cy8mrln_palmpre_update_references (cy8mrln_info->references, cy8mrln_evt.field)) {
-                        if(!cy8mrln_info->asleep) {
+			if(!cy8mrln_info->asleep) {
 #ifdef DEBUG
-                                fprintf(stderr, "cy8mrln: go to sleep\n");
+				fprintf(stderr, "cy8mrln: go to sleep\n");
 #endif
-                                cy8mrln_info->asleep = 1;
-                                cy8mrln_palmpre_set_scanrate(cy8mrln_info, 5);
-                        }
-                        return 0;
-                } else if(cy8mrln_info->asleep) {
+				cy8mrln_info->asleep = 1;
+				cy8mrln_palmpre_set_scanrate(cy8mrln_info, 5);
+			}
+			return 0;
+		} else if(cy8mrln_info->asleep) {
 #ifdef DEBUG
-                        fprintf(stderr, "cy8mrln: woke up\n");
+			fprintf(stderr, "cy8mrln: woke up\n");
 #endif
-                        cy8mrln_palmpre_set_scanrate(cy8mrln_info, cy8mrln_info->scanrate);
-                        cy8mrln_info->asleep = 0;
-                        return 0;
-                }
+			cy8mrln_palmpre_set_scanrate(cy8mrln_info, cy8mrln_info->scanrate);
+			cy8mrln_info->asleep = 0;
+			return 0;
+		}
 		max_x = 0;
 		max_y = 0;
 		max_value = 0;
@@ -469,29 +405,27 @@ static int cy8mrln_palmpre_read(struct tslib_module_info *info, struct ts_sample
 static int cy8mrln_palmpre_update_references(int16_t references[H_FIELDS * V_FIELDS], int16_t field[H_FIELDS * V_FIELDS])
 {
 	int x, y;
-        static int last_discarded = 0;
+	static int last_discarded = 0;
 	for (y = 0; y < V_FIELDS; y ++) {
 		for (x = 0; x < H_FIELDS; x++) {
-                        if(field[y * H_FIELDS + x] < MIN_VALUE || field[y * H_FIELDS + x] > MAX_VALUE) {
+			if(field[y * H_FIELDS + x] < MIN_VALUE || field[y * H_FIELDS + x] > MAX_VALUE) {
 #ifdef DEBUG
-                                fprintf(stderr, "Discrading frame with %i at[%i/%i]\n", field[y * H_FIELDS + x], x, y);
+				fprintf(stderr, "Discrading frame with %i at[%i/%i]\n", field[y * H_FIELDS + x], x, y);
 #endif
-                                last_discarded = 1;
-                                return 1;
-                        } else if(last_discarded) {
-                                last_discarded = 0;
-                                return 1;
-                        } else if (field[y * H_FIELDS + x] > references[y * H_FIELDS + x]) {
-                                if(last_discarded)
+				last_discarded = 1;
+				return 1;
+			} else if(last_discarded) {
+				last_discarded = 0;
+				return 1;
+			} else if (field[y * H_FIELDS + x] > references[y * H_FIELDS + x]) {
 				references [y * H_FIELDS + x] = field [y * H_FIELDS + x];
 				field [y * H_FIELDS + x] = 0;
 			} else {
-                                if(last_discarded)
 				field [y * H_FIELDS + x] = references [y * H_FIELDS + x] - field [y * H_FIELDS + x];
 			}
 		}
 	}
-        return 0;
+	return 0;
 }
 
 static int cy8mrln_palmpre_fini(struct tslib_module_info *info)
@@ -539,7 +473,7 @@ TSAPI struct tslib_module_info *cy8mrln_palmpre_mod_init(struct tsdev *dev, cons
 	info->module.dev = dev;
 	info->last_valid_samples = NULL;
 	info->last_n_valid_samples = 0;
-        info->asleep = 0;
+	info->asleep = 0;
 
 	cy8mrln_palmpre_set_scanrate(info, DEFAULT_SCANRATE);
 	cy8mrln_palmpre_set_timestamp_mode(info, DEFAULT_TIMESTAMP_MODE);
