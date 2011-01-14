@@ -117,7 +117,6 @@ error:
 	return -1;
 }
 
-
 static int cy8mrln_palmpre_set_sleepmode(struct tslib_cy8mrln_palmpre* info, int mode)
 {
 	if (info == NULL || info->module.dev == NULL || ioctl(info->module.dev->fd,CY8MRLN_IOCTL_SET_SLEEPMODE,&mode) < 0)
@@ -165,7 +164,7 @@ static int cy8mrln_palmpre_set_timestamp_mode(struct tslib_cy8mrln_palmpre* info
 {
 	v = v ? 1 : 0;
 	if(info == NULL || info->module.dev == NULL || ioctl(info->module.dev->fd,CY8MRLN_IOCTL_SET_TIMESTAMP_MODE,&v) < 0)
-		goto error;
+	     goto error;
 	info->timestamp_mode = v;
 	return 0;
 	
@@ -198,17 +197,91 @@ static int cy8mrln_palmpre_set_pressure (struct tslib_cy8mrln_palmpre* info, int
 	return 0;
 }
 
+static int cy8mrln_palmpre_set_sensor_offset_x (struct tslib_cy8mrln_palmpre* info, int n)
+{
+	if (info == NULL)
+		return -1;
+
+#ifdef DEBUG
+	printf("sensor_offset_x: %i\n", n);
+#endif
+	
+	info->sensor_offset_x = n;
+	return 0;
+}
+
+static int cy8mrln_palmpre_set_sensor_offset_y (struct tslib_cy8mrln_palmpre* info, int n)
+{
+	if (info == NULL)
+		return -1;
+
+#ifdef DEBUG 
+	printf("sensor_offset_y: %i\n", n);
+#endif
+	
+	info->sensor_offset_y = n;
+	return 0;
+}
+
+static int cy8mrln_palmpre_set_sensor_delta_x (struct tslib_cy8mrln_palmpre* info, int n)
+{
+	if (info == NULL)
+		return -1;
+
+#ifdef DEBUG
+	printf("sensor_delta_x: %i\n", n);
+#endif
+
+	info->sensor_delta_x = n;
+	return 0;
+}
+
+static int cy8mrln_palmpre_set_sensor_delta_y (struct tslib_cy8mrln_palmpre* info, int n)
+{
+	if (info == NULL)
+		return -1;
+
+#ifdef DEBUG
+	printf("sensor_delta_y: %i\n", n);
+#endif
+
+	info->sensor_delta_y = n;
+	return 0;
+}
+
+static int parse_scanrate(struct tslib_module_info *info, char *str, void *data)
+{
+	(void)data;
+	struct tslib_cy8mrln_palmpre *i = container_of(info, struct tslib_cy8mrln_palmpre, module);
+	unsigned long rate = strtoul(str, NULL, 0);
+>>>>>>> 860d69cadedef0dec8ba6259ab5850691d3402e7
+
+	info->noise = n;
+
+	return 0;
+}
+
+static int cy8mrln_palmpre_set_pressure (struct tslib_cy8mrln_palmpre* info, int p)
+{
+	if (info == NULL) {
+		printf("TSLIB: cy8mrln_palmpre: ERROR: could not set default_pressure value\n");
+		return -1;
+	}
+
+	info->pressure = p;
+
+	return 0;
+}
+
 static int parse_scanrate(struct tslib_module_info *info, char *str, void *data)
 {
 	(void)data;
 	struct tslib_cy8mrln_palmpre *i = container_of(info, struct tslib_cy8mrln_palmpre, module);
 	unsigned long rate = strtoul(str, NULL, 0);
 
-	if(rate == ULONG_MAX && errno == ERANGE)
-		return -1;
-
 	return cy8mrln_palmpre_set_scanrate(i, rate);
 }
+
 
 static int parse_wot_scanrate(struct tslib_module_info *info, char *str, void *data)
 {
@@ -248,19 +321,6 @@ static int parse_timestamp_mode(struct tslib_module_info *info, char *str, void 
 
 	return cy8mrln_palmpre_set_timestamp_mode(i, mode);
 }
-
-static int parse_noise(struct tslib_module_info *info, char *str, void *data)
-{
-	(void)data;
-	struct tslib_cy8mrln_palmpre *i = (struct tslib_cy8mrln_palmpre*) info;
-	unsigned long noise = strtoul (str, NULL, 0);
-
-	if(noise == ULONG_MAX && errno == ERANGE)
-		return -1;
-
-	return cy8mrln_palmpre_set_noise (i, noise);
-}
-
 static int parse_pressure(struct tslib_module_info *info, char *str, void *data)
 {
 	(void)data;
